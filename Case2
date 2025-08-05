@@ -1,0 +1,28 @@
+# Базовый класс — Device (Устройство)
+# Производный класс — Smartphone (Смартфон) и Laptop (ноутбук)
+
+class Device:
+    def __init__(self, name):
+        self.name = name
+    def power_on(self):
+        print(f"{self.name} включается.")
+class Smartphone(Device):
+    def power_on(self):
+        print(f"{self.name} включается и загружается Android.")
+class Laptop(Device):
+    def power_on(self):
+        print(f"{self.name} включается и загружается Windows.")
+
+def test_devices():
+    device = Device("Просто устройство")
+    phone = Smartphone("Смартфон")
+    laptop = Laptop("Ноутбук")
+
+    print("Включение:")
+    device.power_on()  # вызов метода из базового класса
+    phone.power_on()           # вызов переопределенного метода в Smartphone
+    laptop.power_on()          # вызов переопределенного метода в Laptop
+
+#тест-кейс 2
+test_devices()
+

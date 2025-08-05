@@ -1,4 +1,4 @@
-def sum_negative_between_extremes(A):
+def sum_negative(A):
     if not A or len(A) < 2:
         return 0
 
@@ -12,7 +12,7 @@ def sum_negative_between_extremes(A):
     negative_sum = sum(x for x in sub_array if x < 0)
     return negative_sum
 
-# Пример тест-кейса
-A = [5, -3, 7, -1, 0, -6, 2, -4]
-result = sum_negative_between_extremes(A)
+#тест-кейс 1
+A = [5, -3, 7, -1, 0, -6, 2, -9]
+result = sum_negative(A)
 print("Сумма отрицательных элементов между минимумом и максимумом:", result)
