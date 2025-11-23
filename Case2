@@ -14,7 +14,7 @@ class Laptop(Device):
         print(f"{self.name} включается и загружается Windows.")
 
 def test_devices():
-    device = Device("Просто устройство")
+    device = Device("Устройство")
     phone = Smartphone("Смартфон")
     laptop = Laptop("Ноутбук")
 
