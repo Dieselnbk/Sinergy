@@ -1,0 +1,19 @@
+Создаем базу данных в SQL
+
+
+CREATE DATABASE WebNotesDB;
+GO
+
+USE WebNotesDB;
+GO
+
+CREATE TABLE Notes (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Title NVARCHAR(100) NOT NULL,
+    Content NVARCHAR(500),
+    CreatedAt DATETIME2 DEFAULT GETDATE()
+);
+GO
+
+-- Делаем первую заметку
+INSERT INTO Notes (Title, Content) VALUES ('Привет!', 'Это первая заметка.');
