@@ -1,18 +1,21 @@
+#Дан одномерный массив А размерности N. Найти сумму отрицательных элементов, расположенных между максимальным и минимальным
 def sum_negative(A):
+    # Проверка на пустой массив или массив из одного элемента.
     if not A or len(A) < 2:
-        return 0
+        return 0  # нет элементов между чем-либо → сумма = 0
 
+    # Находим значение глобального максимума и минимума и их вхождение.
     max_index = A.index(max(A))
     min_index = A.index(min(A))
 
+    # Определяем начало и конец интервала "между" min и max.
     start = min(min_index, max_index) + 1
     end = max(min_index, max_index)
 
+    # Извлекаем подмассив, лежащий между первым min и первым max.
     sub_array = A[start:end]
-    negative_sum = sum(x for x in sub_array if x < 0)
-    return negative_sum
 
-#тест-кейс 1
-A = [5, -3, 7, -1, 0, -6, 2, -9]
-result = sum_negative(A)
-print("Сумма отрицательных элементов между минимумом и максимумом:", result)
+    # Суммируем только те элементы подмассива, которые < 0.
+    negative_sum = sum(x for x in sub_array if x < 0)
+
+    return negative_sum
