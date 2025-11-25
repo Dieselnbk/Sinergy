@@ -1,28 +1,43 @@
-# Базовый класс — Device (Устройство)
-# Производный класс — Smartphone (Смартфон) и Laptop (ноутбук)
+# Написать тестовую программу, которая демонстрирует работу методов базового и производного классов.
 
+#Базовый класс, представляющий любое электронное устройство.
 class Device:
-    def __init__(self, name):
-        self.name = name
-    def power_on(self):
-        print(f"{self.name} включается.")
+def __init__(self, name):
+# Инициализируем общее свойство `name`, доступное всем потомкам.
+self.name = name
+def power_on(self):
+#Базовая реализация включения устройства.
+print(f"{self.name} включается.")
+
+# Производный класс `Smartphone` («Смартфон»), наследует от `Device`
 class Smartphone(Device):
-    def power_on(self):
-        print(f"{self.name} включается и загружается Android.")
+def power_on(self):
+print(f"{self.name} включается и загружается Android.")
+
+# Производный класс `Laptop` («Ноутбук»)
 class Laptop(Device):
-    def power_on(self):
-        print(f"{self.name} включается и загружается Windows.")
+def power_on(self):
+print(f"{self.name} включается и загружается ОС.")
 
+
+# Тестовая функция — демонстрация работы
+# Функция для тестирования поведения объектов разных типов.
+#Демонстрирует ключевую концепцию - наследование: Smartphone и Laptop получают `name` и доступ к Device.
 def test_devices():
-    device = Device("Устройство")
-    phone = Smartphone("Смартфон")
-    laptop = Laptop("Ноутбук")
+# Создаём экземпляры трёх классов
+device = Device("Просто устройство")  # базовый класс
+phone = Smartphone("Смартфон")  # производный класс 1
+laptop = Laptop("Ноутбук")  # производный класс 2
 
-    print("Включение:")
-    device.power_on()  # вызов метода из базового класса
-    phone.power_on()           # вызов переопределенного метода в Smartphone
-    laptop.power_on()          # вызов переопределенного метода в Laptop
+print("Включение:")
 
-#тест-кейс 2
+# Вызываем один и тот же метод у разных объектов → разный результат
+device.power_on()  # → "Просто устройство включается."
+#вызывается реализация из класса Device
+phone.power_on()  # → "Смартфон включается и загружается Android."
+#вызывается переопределённая версия в Smartphone
+laptop.power_on()  # → "Ноутбук включается и загружается Windows."
+#вызывается переопределённая версия в Laptop
+
+# Запуск теста
 test_devices()
-
