@@ -19,3 +19,9 @@ def sum_negative(A):
     negative_sum = sum(x for x in sub_array if x < 0)
 
     return negative_sum
+
+#тест-кейс
+A = [5, -3, 7, -1, 0, -6, 2, -9]
+result = sum_negative(A)
+print("Сумма отрицательных элементов между минимумом и максимумом:", result)
+# Вывод: -7
