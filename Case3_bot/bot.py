@@ -54,7 +54,7 @@ INTENTS = {
     "weather": (
         ["погода", "погоду", "погоде", "температура", "градусы", "сколько градусов", "дождь", "снег", "зонт",
          "тепло", "холодно", "прогноз"],
-        None),   # ответ берётся с сайта Gismeteo (см. web_sources.py)
+        None),   # ответ берётся из сервиса погоды wttr.in (см. web_sources.py)
     "thanks": (
         ["спасибо", "благодарю", "спс", "отлично"],
         "Пожалуйста! Обращайтесь, если появятся вопросы."),
@@ -115,7 +115,7 @@ def weather_reply(text):
     try:
         answer = web_sources.weather_answer(city, tomorrow=tomorrow)
     except web_sources.WebSourceError as e:
-        return f"Не удалось получить погоду: {e}. Попробуйте позже или откройте gismeteo.ru."
+        return f"Не удалось получить погоду: {e}. Попробуйте позже."
     if city is None:
         answer += " Чтобы узнать погоду в другом городе, добавьте его в вопрос."
     return answer

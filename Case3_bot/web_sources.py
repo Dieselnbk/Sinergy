@@ -1,133 +1,111 @@
 # -*- coding: utf-8 -*-
 """
-Модуль получения данных с веб-страниц для ответов бота.
+Получение данных из интернета для ответов бота.
 
-Сейчас реализован один источник — погода с сайта Gismeteo (разбор HTML главной
-страницы города). Архитектура позволяет добавлять другие источники: достаточно
-написать функцию, которая принимает запрос пользователя и возвращает строку.
+Погода запрашивается у сервиса wttr.in одним HTTP-запросом:
+    https://wttr.in/<город>?format=j1&lang=ru
+Ключ и регистрация не нужны. Используется только стандартная библиотека Python
+(urllib + json), сторонние модули не требуются.
 
 Особенности:
-  * кэш ответов (по умолчанию 10 минут), чтобы не нагружать сайт;
-  * таймаут и обработка ошибок сети — при сбое бот отвечает понятным сообщением;
-  * разбор HTML отделён от загрузки страницы (parse_gismeteo), поэтому его можно
-    тестировать без интернета.
+  * кэш ответов на 10 минут, чтобы не нагружать сервис;
+  * таймаут и обработка ошибок — при сбое бот отвечает понятным сообщением;
+  * загрузка (fetch_json) отделена от разбора (weather_answer), поэтому
+    в тестах сеть подменяется сохранённым ответом.
 """
+import json
 import time
-import requests
-from bs4 import BeautifulSoup
+import urllib.error
+import urllib.parse
+import urllib.request
 
-GISMETEO = "https://www.gismeteo.ru"
-HEADERS = {
-    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
-    "Accept-Language": "ru-RU,ru;q=0.9",
-}
+WTTR = "https://wttr.in/{query}?format=j1&lang=ru"
 TIMEOUT = 8          # секунд
 CACHE_TTL = 600      # секунд
 
-# Города: (варианты названия в запросе) -> (название для ответа, адрес на Gismeteo).
-# Адреса проверены вручную (страницы существуют).
+# Города: название в вопросе -> (как показывать в ответе, запрос к сервису).
+# Показываем своё название: сервис иногда возвращает название района или пригорода,
+# но координаты и температура относятся к городу.
 CITIES = {
-    "москва": ("Москва", "/weather-moscow-4368/"),
-    "санкт-петербург": ("Санкт-Петербург", "/weather-sankt-peterburg-4079/"),
-    "питер": ("Санкт-Петербург", "/weather-sankt-peterburg-4079/"),
-    "спб": ("Санкт-Петербург", "/weather-sankt-peterburg-4079/"),
-    "казань": ("Казань", "/weather-kazan-4364/"),
-    "новосибирск": ("Новосибирск", "/weather-novosibirsk-4690/"),
-    "сочи": ("Сочи", "/weather-sochi-5233/"),
-    "краснодар": ("Краснодар", "/weather-krasnodar-5136/"),
-    "самара": ("Самара", "/weather-samara-4618/"),
-    "уфа": ("Уфа", "/weather-ufa-4588/"),
-    "челябинск": ("Челябинск", "/weather-chelyabinsk-4565/"),
-    "нижний новгород": ("Нижний Новгород", "/weather-nizhny-novgorod-4355/"),
-    "ростов-на-дону": ("Ростов-на-Дону", "/weather-rostov-na-donu-5110/"),
+    "москва": ("Москва", "Moscow,Russia"),
+    "санкт-петербург": ("Санкт-Петербург", "Saint Petersburg,Russia"),
+    "питер": ("Санкт-Петербург", "Saint Petersburg,Russia"),
+    "спб": ("Санкт-Петербург", "Saint Petersburg,Russia"),
+    "казань": ("Казань", "Kazan,Russia"),
+    "новосибирск": ("Новосибирск", "Novosibirsk,Russia"),
+    "екатеринбург": ("Екатеринбург", "Yekaterinburg,Russia"),
+    "сочи": ("Сочи", "Sochi,Russia"),
+    "краснодар": ("Краснодар", "Krasnodar,Russia"),
+    "самара": ("Самара", "Samara,Russia"),
+    "уфа": ("Уфа", "Ufa,Russia"),
+    "челябинск": ("Челябинск", "Chelyabinsk,Russia"),
+    "воронеж": ("Воронеж", "Voronezh,Russia"),
+    "владивосток": ("Владивосток", "Vladivostok,Russia"),
+    "нижний новгород": ("Нижний Новгород", "Nizhny Novgorod,Russia"),
+    "ростов-на-дону": ("Ростов-на-Дону", "Rostov-on-Don,Russia"),
 }
 DEFAULT_CITY = "москва"   # головной офис университета
 
-_cache = {}   # url -> (время, html)
+_cache = {}   # url -> (время, данные)
 
 
 class WebSourceError(Exception):
-    """Не удалось получить или разобрать данные с сайта."""
+    """Не удалось получить или разобрать данные."""
 
 
-def fetch(url, session=None):
-    """Загрузка страницы с кэшем. Бросает WebSourceError при проблемах сети."""
+def fetch_json(url):
+    """Загрузка JSON по адресу с кэшем. Бросает WebSourceError при сбоях."""
     now = time.time()
     hit = _cache.get(url)
     if hit and now - hit[0] < CACHE_TTL:
         return hit[1]
+    req = urllib.request.Request(url, headers={"User-Agent": "curl/8.0"})
     try:
-        r = (session or requests).get(url, headers=HEADERS, timeout=TIMEOUT)
-    except requests.RequestException as e:
-        raise WebSourceError(f"нет соединения с сайтом ({type(e).__name__})")
-    if r.status_code != 200:
-        raise WebSourceError(f"сайт вернул код {r.status_code}")
-    r.encoding = "utf-8"
-    _cache[url] = (now, r.text)
-    return r.text
-
-
-def _temp(node):
-    """Значение температуры из тега <temperature-value value="15">."""
-    if node is None or not node.get("value"):
-        return None
-    try:
-        return int(float(node["value"]))
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise WebSourceError(f"сервис вернул код {e.code}")
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise WebSourceError("нет соединения с сервисом погоды")
     except ValueError:
-        return None
+        raise WebSourceError("сервис вернул непонятный ответ")
+    _cache[url] = (now, data)
+    return data
 
 
 def fmt_t(v):
-    """+15, −2, 0 — как на сайте."""
+    """Температура как +15, −2, 0."""
     return f"{v:+d}".replace("-", "−") if v else "0"
 
 
-def parse_gismeteo(html):
-    """
-    Разбор главной страницы города на Gismeteo. Возвращает словарь:
-      now, feels, now_desc, today_min, today_max, tomorrow_min, tomorrow_max, tomorrow_desc
-    Строится по блоку .weathertabs: вкладки «Сейчас», «Сегодня», «Завтра».
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    tabs = soup.select(".weathertabs .weathertab")
-    if len(tabs) < 3:
-        raise WebSourceError("структура страницы изменилась (не найдены вкладки погоды)")
-    now_tab, today_tab, tomorrow_tab = tabs[0], tabs[1], tabs[2]
-
-    now = _temp(now_tab.select_one(".weather-value temperature-value"))
-    feels = _temp(now_tab.select_one(".weather-feel temperature-value"))
-    if now is None:
-        raise WebSourceError("не найдена текущая температура")
-
-    def minmax(tab):
-        vals = [_temp(v) for v in tab.select(".chart .value temperature-value")]
-        vals = [v for v in vals if v is not None]
-        return (vals[0], vals[1]) if len(vals) >= 2 else (None, None)
-
-    t_min, t_max = minmax(today_tab)
-    tm_min, tm_max = minmax(tomorrow_tab)
-    return {
-        "now": now, "feels": feels,
-        "now_desc": now_tab.get("data-tooltip", ""),
-        "today_min": t_min, "today_max": t_max,
-        "tomorrow_min": tm_min, "tomorrow_max": tm_max,
-        "tomorrow_desc": tomorrow_tab.get("data-tooltip", ""),
-    }
+def _ru(node, default=""):
+    """Описание погоды на русском из поля lang_ru."""
+    try:
+        return node["lang_ru"][0]["value"].lower()
+    except (KeyError, IndexError, TypeError):
+        return default
 
 
-def weather_answer(city_key=None, tomorrow=False, session=None):
+def weather_answer(city_key=None, tomorrow=False):
     """Готовый текст ответа о погоде."""
-    name, path = CITIES[city_key or DEFAULT_CITY]
-    data = parse_gismeteo(fetch(GISMETEO + path, session))
-    if tomorrow:
-        return (f"{name}, завтра: от {fmt_t(data['tomorrow_min'])} до {fmt_t(data['tomorrow_max'])} °C, "
-                f"{data['tomorrow_desc']}. (Источник: Gismeteo)")
-    text = f"{name}, сейчас: {fmt_t(data['now'])} °C"
-    if data["feels"] is not None:
-        text += f" (по ощущению {fmt_t(data['feels'])})"
-    if data["now_desc"]:
-        text += f", {data['now_desc']}"
-    if data["today_min"] is not None:
-        text += f". Сегодня от {fmt_t(data['today_min'])} до {fmt_t(data['today_max'])} °C"
-    return text + ". (Источник: Gismeteo)"
+    name, query = CITIES[city_key or DEFAULT_CITY]
+    data = fetch_json(WTTR.format(query=urllib.parse.quote(query)))
+    try:
+        if tomorrow:
+            day = data["weather"][1]
+            desc = _ru(day["hourly"][4])          # описание на середину дня
+            return (f"{name}, завтра: от {fmt_t(int(day['mintempC']))} до {fmt_t(int(day['maxtempC']))} °C"
+                    + (f", {desc}" if desc else "") + ". (Источник: wttr.in)")
+        cur = data["current_condition"][0]
+        today = data["weather"][0]
+        wind = round(int(cur["windspeedKmph"]) / 3.6)          # км/ч -> м/с
+        pressure = round(int(cur["pressure"]) * 0.750062)      # гПа -> мм рт. ст.
+        desc = _ru(cur)
+        return (f"{name}, сейчас: {fmt_t(int(cur['temp_C']))} °C "
+                f"(по ощущению {fmt_t(int(cur['FeelsLikeC']))})"
+                + (f", {desc}" if desc else "")
+                + f", ветер {wind} м/с, влажность {cur['humidity']} %, давление {pressure} мм рт. ст. "
+                f"Сегодня от {fmt_t(int(today['mintempC']))} до {fmt_t(int(today['maxtempC']))} °C. "
+                "(Источник: wttr.in)")
+    except (KeyError, IndexError, ValueError, TypeError):
+        raise WebSourceError("сервис вернул данные в неожиданном формате")

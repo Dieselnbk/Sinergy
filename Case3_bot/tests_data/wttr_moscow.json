@@ -1,0 +1,77 @@
+{
+ "current_condition": [
+  {
+   "temp_C": "15",
+   "FeelsLikeC": "11",
+   "humidity": "44",
+   "pressure": "1032",
+   "windspeedKmph": "12",
+   "lang_ru": [
+    {
+     "value": "Солнечно"
+    }
+   ],
+   "weatherDesc": [
+    {
+     "value": "Sunny"
+    }
+   ]
+  }
+ ],
+ "weather": [
+  {
+   "date": "2026-09-29",
+   "mintempC": "8",
+   "maxtempC": "15",
+   "hourly": [
+    {},
+    {},
+    {},
+    {},
+    {
+     "lang_ru": [
+      {
+       "value": "Солнечно"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "date": "2026-09-30",
+   "mintempC": "9",
+   "maxtempC": "15",
+   "hourly": [
+    {},
+    {},
+    {},
+    {},
+    {
+     "lang_ru": [
+      {
+       "value": "Солнечно"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "date": "2026-10-01",
+   "mintempC": "8",
+   "maxtempC": "14",
+   "hourly": [
+    {},
+    {},
+    {},
+    {},
+    {
+     "lang_ru": [
+      {
+       "value": "Пасмурно"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

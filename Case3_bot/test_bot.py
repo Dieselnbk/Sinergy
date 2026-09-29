@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
 """Тестирование бота: точность распознавания и скорость ответа."""
 import time
+import json
 import os
 import bot
 import web_sources
 from bot import classify, reply
 
-# Подмена сетевого запроса сохранённым фрагментом страницы Gismeteo (тесты работают без интернета)
-FIXTURE = open(os.path.join(os.path.dirname(__file__), "tests_data", "gismeteo_moscow_fragment.html"),
-               encoding="utf-8").read()
+# Подмена сетевого запроса сохранённым ответом wttr.in (тесты работают без интернета)
+with open(os.path.join(os.path.dirname(__file__), "tests_data", "wttr_moscow.json"), encoding="utf-8") as f:
+    FIXTURE = json.load(f)
 CALLS = []
 
 
-def fake_fetch(url, session=None):
+def fake_fetch(url):
     CALLS.append(url)
     return FIXTURE
 
 
-web_sources.fetch = fake_fetch
+web_sources.fetch_json = fake_fetch
 
 # (фраза, ожидаемый интент). None — вопрос вне тематики (ожидается fallback).
 TESTS = [
@@ -82,7 +83,7 @@ for e in errors:
 
 
 # ---- Проверка работы с веб-источником -------------------------------------
-print("\n--- Тесты веб-источника (Gismeteo) ---")
+print("\n--- Тесты веб-источника (wttr.in) ---")
 checks = []
 
 
@@ -93,37 +94,38 @@ def check(name, cond):
 
 CALLS.clear()
 a = reply("Какая погода?")
-check("город по умолчанию — Москва, есть температура", "Москва, сейчас: +15" in a and "Gismeteo" in a)
-check("запрос ушёл на страницу Москвы", CALLS[-1].endswith("/weather-moscow-4368/"))
+check("город по умолчанию — Москва, есть температура", "Москва, сейчас: +15 °C (по ощущению +11), солнечно" in a)
+check("в ответе ветер, влажность, давление", "ветер 3 м/с" in a and "влажность 44 %" in a and "774 мм рт. ст." in a)
+check("запрос ушёл с городом Moscow", "wttr.in/Moscow%2CRussia" in CALLS[-1])
 check("в ответе есть подсказка про другой город", "другом городе" in a)
 
 a = reply("погода в Казани")
-check("город из запроса (Казань) -> нужный адрес", CALLS[-1].endswith("/weather-kazan-4364/") and "Казань" in a)
+check("город из запроса (Казань) -> нужный адрес", "Kazan" in CALLS[-1] and "Казань" in a)
 
 a = reply("Какая погода в Санкт-Петербурге?")
-check("дефисный город (Санкт-Петербург)", CALLS[-1].endswith("/weather-sankt-peterburg-4079/"))
+check("дефисный город (Санкт-Петербург)", "Saint%20Petersburg" in CALLS[-1] and "Санкт-Петербург" in a)
 
 a = reply("погода в Нижнем Новгороде")
-check("город из двух слов (Нижний Новгород)", CALLS[-1].endswith("/weather-nizhny-novgorod-4355/"))
+check("город из двух слов (Нижний Новгород)", "Nizhny%20Novgorod" in CALLS[-1] and "Нижний Новгород" in a)
 
 a = reply("Какая погода завтра в Сочи")
-check("прогноз на завтра", "завтра" in a and "от +8 до +16" in a and CALLS[-1].endswith("/weather-sochi-5233/"))
+check("прогноз на завтра", "завтра" in a and "от +9 до +15" in a and "Sochi" in CALLS[-1])
 
 check("формат отрицательной температуры", web_sources.fmt_t(-2) == "−2" and web_sources.fmt_t(0) == "0"
       and web_sources.fmt_t(5) == "+5")
 
 
-def broken_fetch(url, session=None):
-    raise web_sources.WebSourceError("нет соединения с сайтом (ConnectionError)")
+def broken_fetch(url):
+    raise web_sources.WebSourceError("нет соединения с сервисом погоды")
 
 
-web_sources.fetch = broken_fetch
+web_sources.fetch_json = broken_fetch
 a = reply("какая погода")
 check("сбой сети -> понятное сообщение, а не ошибка", a.startswith("Не удалось получить погоду"))
 
-web_sources.fetch = lambda url, session=None: "<html><body>пусто</body></html>"
+web_sources.fetch_json = lambda url: {"unexpected": True}
 a = reply("какая погода")
-check("страница изменила структуру -> понятное сообщение", "структура страницы изменилась" in a)
+check("неожиданный формат ответа -> понятное сообщение", "неожиданном формате" in a)
 
 failed = checks.count(False)
 print(f"Веб-тесты: пройдено {checks.count(True)} из {len(checks)}")
