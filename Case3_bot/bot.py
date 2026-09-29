@@ -8,6 +8,7 @@
 import re
 import time
 from nltk.stem.snowball import SnowballStemmer
+import web_sources
 
 stemmer = SnowballStemmer("russian")
 
@@ -50,6 +51,10 @@ INTENTS = {
         ["факультет", "направление", "специальность", "профиль", "программа", "программы", "информатика", "it"],
         "В университете свыше 25 факультетов: IT, право, экономика, дизайн, медицина и др. "
         "Программа «Прикладная информатика» (09.03.03) есть на факультете информационных технологий."),
+    "weather": (
+        ["погода", "погоду", "погоде", "температура", "градусы", "сколько градусов", "дождь", "снег", "зонт",
+         "тепло", "холодно", "прогноз"],
+        None),   # ответ берётся с сайта Gismeteo (см. web_sources.py)
     "thanks": (
         ["спасибо", "благодарю", "спс", "отлично"],
         "Пожалуйста! Обращайтесь, если появятся вопросы."),
@@ -78,18 +83,50 @@ def classify(text):
     """Возвращает (интент, score). Score — число совпавших ключевых слов."""
     tokens = tokenize(text)
     token_set = set(tokens)
-    best, best_score = None, 0
+    best, best_key = None, (0, 0)
     for name, kws in PROCESSED.items():
-        score = sum(1 for kw in kws if all(t in token_set for t in kw))
-        if score > best_score:
-            best, best_score = name, score
-    return best, best_score
+        matched = [kw for kw in kws if all(t in token_set for t in kw)]
+        # ключ сравнения: (число совпавших слов, суммарная длина основ)
+        key = (sum(len(kw) for kw in matched), sum(len(t) for kw in matched for t in kw))
+        if key > best_key:
+            best, best_key = name, key
+    return best, best_key[0]
+
+
+# Города для запроса погоды: стемы названий -> ключ в web_sources.CITIES
+CITY_STEMS = {}
+for key in web_sources.CITIES:
+    CITY_STEMS[key] = [stemmer.stem(w.replace("ё", "е")) for w in key.split()]
+
+
+def find_city(text):
+    """Ищет в тексте название города. None — город не указан."""
+    token_set = set(tokenize(text))
+    for key, stems in CITY_STEMS.items():
+        if all(st in token_set for st in stems):
+            return key
+    return None
+
+
+def weather_reply(text):
+    """Ответ о погоде: город из запроса (по умолчанию Москва), сегодня или завтра."""
+    city = find_city(text)
+    tomorrow = stemmer.stem("завтра") in set(tokenize(text))
+    try:
+        answer = web_sources.weather_answer(city, tomorrow=tomorrow)
+    except web_sources.WebSourceError as e:
+        return f"Не удалось получить погоду: {e}. Попробуйте позже или откройте gismeteo.ru."
+    if city is None:
+        answer += " Чтобы узнать погоду в другом городе, добавьте его в вопрос."
+    return answer
 
 
 def reply(text):
     intent, score = classify(text)
     if intent is None:
         return FALLBACK
+    if intent == "weather":
+        return weather_reply(text)
     return INTENTS[intent][1]
 
 
